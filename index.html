@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Flappy Bird</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    canvas { background: #70c5ce; display: block; margin: auto; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="320" height="480"></canvas>
+<script>
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+
+  let frames = 0;
+  const DEGREE = Math.PI / 180;
+
+  const birdImg = new Image();
+  birdImg.src = "https://i.ibb.co/qM48jh4P/flappy-bird.png";
+
+  const pipeImg = new Image();
+  pipeImg.src = "https://i.ibb.co/HLwh9ZBN/pipe.png";
+
+  const bgImg = new Image();
+  bgImg.src = "https://i.ibb.co/NnkVFfXF/background.png";
+
+  const flapSound = new Audio("https://freesound.org/data/previews/276/276020_4486188-lq.mp3");
+  const scoreSound = new Audio("https://freesound.org/data/previews/202/202293_285997-lq.mp3");
+
+  const state = {
+    current: 0,
+    getReady: 0,
+    game: 1,
+    over: 2
+  };
+
+  canvas.addEventListener("click", function(evt) {
+    switch (state.current) {
+      case state.getReady:
+        state.current = state.game;
+        break;
+      case state.game:
+        bird.flap();
+        flapSound.play();
+        break;
+      case state.over:
+        pipes.reset();
+        bird.reset();
+        score.reset();
+        state.current = state.getReady;
+        break;
+    }
+  });
+
+  const bird = {
+    x: 50,
+    y: 150,
+    w: 34,
+    h: 26,
+
+    radius: 12,
+
+    gravity: 0.25,
+    jump: 4.6,
+    speed: 0,
+    rotation: 0,
+
+    draw: function () {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rotation);
+      ctx.drawImage(birdImg, -this.w / 2, -this.h / 2, this.w, this.h);
+      ctx.restore();
+    },
+
+    flap: function () {
+      this.speed = -this.jump;
+    },
+
+    update: function () {
+      if (state.current == state.getReady) {
+        this.y = 150;
+        this.rotation = 0 * DEGREE;
+      } else {
+        this.speed += this.gravity;
+        this.y += this.speed;
+
+        if (this.y + this.h / 2 >= canvas.height) {
+          this.y = canvas.height - this.h / 2;
+          if (state.current == state.game) {
+            state.current = state.over;
+          }
+        }
+
+        if (this.speed >= this.jump) {
+          this.rotation = 90 * DEGREE;
+        } else {
+          this.rotation = -25 * DEGREE;
+        }
+      }
+    },
+
+    reset: function () {
+      this.speed = 0;
+      this.y = 150;
+    }
+  };
+
+  const pipes = {
+    position: [],
+    w: 53,
+    h: 320,
+    gap: 85,
+    maxYPos: -150,
+    dx: 2,
+
+    draw: function () {
+      for (let i = 0; i < this.position.length; i++) {
+        let p = this.position[i];
+
+        let topYPos = p.y;
+        let bottomYPos = p.y + this.h + this.gap;
+
+        ctx.drawImage(pipeImg, p.x, topYPos, this.w, this.h);
+        ctx.drawImage(pipeImg, p.x, bottomYPos, this.w, this.h);
+      }
+    },
+
+    update: function () {
+      if (state.current !== state.game) return;
+
+      if (frames % 100 == 0) {
+        this.position.push({
+          x: canvas.width,
+          y: this.maxYPos * (Math.random() + 1),
+          passed: false
+        });
+      }
+
+      for (let i = 0; i < this.position.length; i++) {
+        let p = this.position[i];
+
+        p.x -= this.dx;
+
+        // Score detection
+        if (!p.passed && p.x + this.w < bird.x) {
+          score.value += 5;
+          p.passed = true;
+          scoreSound.play();
+        }
+
+        // Remove pipes
+        if (p.x + this.w <= 0) {
+          this.position.shift();
+        }
+      }
+    },
+
+    reset: function () {
+      this.position = [];
+    }
+  };
+
+  const score = {
+    value: 0,
+
+    draw: function () {
+      ctx.fillStyle = "#FFF";
+      ctx.strokeStyle = "#000";
+
+      if (state.current == state.game) {
+        ctx.lineWidth = 2;
+        ctx.font = "35px Tahoma";
+        ctx.fillText(this.value, canvas.width / 2 - 10, 50);
+        ctx.strokeText(this.value, canvas.width / 2 - 10, 50);
+      }
+    },
+
+    reset: function () {
+      this.value = 0;
+    }
+  };
+
+  function loop() {
+    update();
+    draw();
+    frames++;
+    requestAnimationFrame(loop);
+  }
+
+  function update() {
+    bird.update();
+    pipes.update();
+  }
+
+  function draw() {
+    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
